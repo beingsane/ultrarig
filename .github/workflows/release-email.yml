@@ -19,9 +19,9 @@ on:
         type: boolean
         default: false
       mode:
-        description: "send (default), dry_run (show what the list sync would do, send nothing), setup (create the Resend segment once), status (how each mail of this tag ended, sends nothing), catch_up (send this tag only to people who signed up after it went out) or news (the newsletter saved under this tag, test_to first)"
+        description: "send (default), dry_run (show what the list sync would do, send nothing), setup (create the Resend segment once), status (how each mail of this tag ended, sends nothing), catch_up (send this tag only to people who signed up after it went out) or news (the newsletter saved under this tag, test_to first) or gap (a news tag already sent, only to signups it missed; run again until remaining is 0)"
         type: choice
-        options: [send, dry_run, setup, status, catch_up, news]
+        options: [send, dry_run, setup, status, catch_up, news, gap]
         default: send
 
 jobs:
@@ -41,6 +41,8 @@ jobs:
           set -euo pipefail
           if [ "$MODE" = "status" ]; then
             payload=$(jq -n --arg tag "$TAG" '{tag: $tag, status: true}')
+          elif [ "$MODE" = "gap" ]; then
+            payload=$(jq -n --arg tag "$TAG" '{tag: $tag, news: true, gap: true}')
           elif [ "$MODE" = "news" ]; then
             payload=$(jq -n --arg tag "$TAG" --arg test_to "$TEST_TO" --argjson force "$FORCE"               '{tag: $tag, news: true, force: $force} + (if $test_to != "" then {test_to: $test_to} else {} end)')
           else
@@ -61,4 +63,4 @@ jobs:
           echo "### Release email" >> "$GITHUB_STEP_SUMMARY"
           echo '```json' >> "$GITHUB_STEP_SUMMARY"; echo "$body" >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
           test "$code" = "200"
-          if [ "$MODE" = "send" ] || [ "$MODE" = "catch_up" ] || [ "$MODE" = "news" ]; then jq -e '(.failed // []) | length == 0' <<< "$body" > /dev/null; fi
+          if [ "$MODE" = "send" ] || [ "$MODE" = "catch_up" ] || [ "$MODE" = "news" ] || [ "$MODE" = "gap" ]; then jq -e '(.failed // []) | length == 0' <<< "$body" > /dev/null; fi
